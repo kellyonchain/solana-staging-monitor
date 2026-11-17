@@ -1,0 +1,33 @@
+name: Run Collector
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"   # Runs every 4 hours
+  workflow_dispatch:        # Allows manual run
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run collector
+        env:
+          RPC_URL: ${{ secrets.HELIUS_RPC_URL }}
+        run: python collect.py
+
+      - name: Commit data
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add data/
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update collected data" && git push)
