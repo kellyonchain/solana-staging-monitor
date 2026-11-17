@@ -5,39 +5,61 @@ from datetime import datetime, timezone
 
 RPC_URL = os.environ.get("RPC_URL")
 
-def get_signatures_for_address(address, limit=15):
+SYSTEM_PROGRAM = "11111111111111111111111111111111"
+
+def get_recent_signatures(address: str, limit: int = 15):
+    """Fetch recent signatures for a given address."""
     payload = {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "getSignaturesForAddress",
         "params": [address, {"limit": limit}]
     }
-    response = requests.post(RPC_URL, json=payload, timeout=30)
-    data = response.json()
-    return data.get("result", [])
 
-def save_to_csv(filename, rows):
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    file_exists = os.path.isfile(filename)
+    try:
+        response = requests.post(RPC_URL, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("result", [])
+    except Exception as e:
+        print(f"Error fetching signatures: {e}")
+        return []
 
-    with open(filename, "a", newline="") as f:
+
+def save_events(filepath: str, rows: list):
+    """Save events to CSV (append mode)."""
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    file_exists = os.path.isfile(filepath)
+
+    with open(filepath, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["timestamp", "signature", "address", "slot", "note"])
+            writer.writerow([
+                "timestamp",
+                "signature",
+                "address",
+                "slot",
+                "err",
+                "note"
+            ])
         writer.writerows(rows)
 
-if __name__ == "__main__":
-    print("Starting Solana Staging Monitor...")
+
+def main():
+    print("========================================")
+    print(" Solana Staging Monitor - Collector")
+    print("========================================")
 
     if not RPC_URL:
-        print("Error: RPC_URL not found in environment")
+        print("❌ ERROR: RPC_URL not found in environment variables.")
         exit(1)
 
-    # System Program - durable nonce instructions go through here
-    SYSTEM_PROGRAM = "11111111111111111111111111111111"
+    print("📡 Fetching recent System Program activity...")
+    signatures = get_recent_signatures(SYSTEM_PROGRAM, limit=12)
 
-    print("Fetching recent signatures...")
-    signatures = get_signatures_for_address(SYSTEM_PROGRAM, limit=10)
+    if not signatures:
+        print("No signatures found.")
+        return
 
     rows = []
     for sig in signatures:
@@ -46,10 +68,16 @@ if __name__ == "__main__":
             sig.get("signature"),
             SYSTEM_PROGRAM,
             sig.get("slot"),
-            "system_program_activity"
+            sig.get("err"),
+            "system_program_potential_nonce_activity"
         ])
 
-    save_to_csv("data/events.csv", rows)
+    save_events("data/events.csv", rows)
 
-    print(f"Saved {len(rows)} events to data/events.csv")
+    print(f"✅ Saved {len(rows)} events to data/events.csv")
     print("Collector finished successfully.")
+    print("========================================")
+
+
+if __name__ == "__main__":
+    main()
