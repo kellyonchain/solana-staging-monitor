@@ -3,8 +3,7 @@ import csv
 import os
 from datetime import datetime, timezone
 
-# Temporary - we will move this to GitHub Secrets later
-RPC_URL = "https://mainnet.helius-rpc.com/?api-key=1ea2de33-6793-4b30-851b-111d17a52625"
+RPC_URL = os.environ.get("RPC_URL")
 
 def get_signatures_for_address(address, limit=20):
     payload = {
@@ -28,8 +27,12 @@ def save_to_csv(filename, rows):
 if __name__ == "__main__":
     print("Starting collector...")
 
-    # For now we just test with a known system program (we will change this later)
-    test_address = "11111111111111111111111111111111"  # System Program
+    if not RPC_URL:
+        print("Error: RPC_URL not found")
+        exit(1)
+
+    # Temporary test address (System Program)
+    test_address = "11111111111111111111111111111111"
     
     signatures = get_signatures_for_address(test_address, limit=5)
     
